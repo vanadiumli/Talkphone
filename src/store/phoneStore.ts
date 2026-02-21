@@ -143,7 +143,6 @@ export function getCharMemory(conv: Conversation | undefined, charId: string): C
   if (!conv) return null
   const cm = conv.charMemories?.[charId]
   if (cm) return cm
-  const firstChar = conv.charIds[0]
   if (conv.charIds.includes(charId)) {
     return {
       impressionTags: conv.impressionTags ?? [],
@@ -221,7 +220,7 @@ emoji：大多数回复不要带emoji。只在真正需要的时候偶尔用一�
 
 /** 构建记忆块，按读取顺序：温度 → 印象 → 手帐 → 事件型。控制 token，按需读取。 */
 export function buildMemoryPrompt(
-  charName: string,
+  _charName: string,
   charMemory: CharMemory | null,
   relationshipStage: number,
   char: Pick<AIChar, 'memoryChunks'>,
@@ -402,7 +401,7 @@ export const usePhoneStore = create<PhoneState>()(
       updateCharMemory: (convId: string, charId: string, u: Partial<CharMemory>) => set((s) => ({
         conversations: s.conversations.map((conv) => {
           if (conv.id !== convId) return conv
-          const prev = conv.charMemories?.[charId] ?? {}
+          const prev: Partial<CharMemory> = conv.charMemories?.[charId] ?? {}
           const next: CharMemory = {
             impressionTags: prev.impressionTags ?? conv.impressionTags ?? [],
             impressionMonologue: prev.impressionMonologue ?? conv.impressionMonologue ?? '',

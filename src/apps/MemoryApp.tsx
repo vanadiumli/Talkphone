@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronDown, ChevronRight, Plus, Trash2, Pencil, Sparkles, Loader } from 'lucide-react'
-import { usePhoneStore, AFFECTION_STAGES, getCharMemory, type JournalMonth, type JournalEntry, type HandEntry, type DailyDiary, type MonthlyDiary } from '../store/phoneStore'
+import { usePhoneStore, AFFECTION_STAGES, getCharMemory, type JournalMonth, type JournalEntry, type HandEntry } from '../store/phoneStore'
 
 type MemTab = 'impression' | 'journal' | 'traces'
 
