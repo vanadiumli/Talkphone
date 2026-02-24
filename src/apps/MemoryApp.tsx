@@ -137,15 +137,18 @@ export default function MemoryApp() {
 
   // ── AI analysis helper ──
   async function callAI(systemPrompt: string, userContent: string): Promise<string> {
-    const { baseUrl, apiKey, model } = apiSettings
+    const { baseUrl, apiKey, model, advancedApiEnabled, summaryModel, summaryTemperature } = apiSettings
     if (!baseUrl || !apiKey) throw new Error('未配置 API')
+    const useSummary = !!(advancedApiEnabled && summaryModel)
+    const useModel = useSummary ? summaryModel : (model || 'gpt-4o-mini')
+    const useTemp = useSummary ? (summaryTemperature ?? 0.7) : 0.7
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: model || 'gpt-4o-mini',
+        model: useModel,
         messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }],
-        temperature: 0.7,
+        temperature: useTemp,
       }),
     })
     if (!res.ok) throw new Error('API 错误')

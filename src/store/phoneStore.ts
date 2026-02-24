@@ -25,6 +25,8 @@ export interface AIChar {
   birthday?: string; height?: string; mbti?: string
   likes?: string; dislikes?: string
   personality?: string; background?: string; otherSettings?: string
+  /** MiniMax 音色 ID，用于 AI 语音克隆（T2A） */
+  cloneVoiceId?: string
 }
 
 export interface UserMask {
@@ -147,12 +149,25 @@ export interface Conversation {
   worldBookIds?: string[]
 }
 
-interface ApiSettings { baseUrl: string; apiKey: string; model: string; temperature: number }
+interface ApiSettings {
+  baseUrl: string
+  apiKey: string
+  model: string
+  temperature: number
+  /** 启用后，记忆/总结类任务使用 summaryModel，对话仍用 model */
+  advancedApiEnabled?: boolean
+  /** 记忆总结等用的便宜小模型，如 gpt-4o-mini */
+  summaryModel?: string
+  /** 记忆/总结用模型的温度，默认 0.7 */
+  summaryTemperature?: number
+}
 
 interface PhoneState {
   currentApp: string | null; closingApp: boolean; time: string; batteryLevel: number
   polaroidPhoto: string | null; darkMode: boolean; wallpaper: string | null; customIcons: Record<string, string>
   apiSettings: ApiSettings
+  /** MiniMax T2A 克隆音色：开启后 AI 回复可播放为指定音色 */
+  cloneVoiceSettings: { enabled: boolean; groupId: string; apiKey: string }
   // Music (in-memory only, not persisted)
   playlist: MusicTrack[]; currentTrackIndex: number; isPlaying: boolean
   addTrack: (t: Omit<MusicTrack, 'id'>) => void
@@ -182,6 +197,7 @@ interface PhoneState {
   openApp: (appId: string) => void; closeApp: () => void
   setTime: (t: string) => void; setPolaroidPhoto: (url: string) => void
   setApiSettings: (s: Partial<ApiSettings>) => void
+  setCloneVoiceSettings: (s: Partial<PhoneState['cloneVoiceSettings']>) => void
   setNeteaseApiUrl: (url: string) => void
   setDarkMode: (v: boolean) => void; setWallpaper: (url: string | null) => void
   setCustomIcon: (appId: string, url: string) => void; removeCustomIcon: (appId: string) => void
@@ -406,7 +422,8 @@ export const usePhoneStore = create<PhoneState>()(
     (set: import('zustand').StoreApi<PhoneState>['setState']) => ({
       currentApp: null, closingApp: false, time: getCurrentTime(),
       batteryLevel: 79, polaroidPhoto: null, darkMode: false, wallpaper: null, customIcons: {},
-      apiSettings: { baseUrl: '', apiKey: '', model: '', temperature: 0.7 },
+      apiSettings: { baseUrl: '', apiKey: '', model: '', temperature: 0.7, advancedApiEnabled: false, summaryModel: 'gpt-4o-mini', summaryTemperature: 0.7 },
+      cloneVoiceSettings: { enabled: false, groupId: '', apiKey: '' },
       neteaseApiUrl: '',
       chars: DEFAULT_CHARS,
       userMasks: DEFAULT_MASKS,
@@ -429,6 +446,7 @@ export const usePhoneStore = create<PhoneState>()(
       setTime: (time: string) => set({ time }),
       setPolaroidPhoto: (url: string) => set({ polaroidPhoto: url }),
       setApiSettings: (s: Partial<ApiSettings>) => set((state) => ({ apiSettings: { ...state.apiSettings, ...s } })),
+      setCloneVoiceSettings: (s: Partial<{ enabled: boolean; groupId: string; apiKey: string }>) => set((state) => ({ cloneVoiceSettings: { ...state.cloneVoiceSettings, ...s } })),
       setNeteaseApiUrl: (url: string) => set({ neteaseApiUrl: url }),
       setDarkMode: (v: boolean) => set({ darkMode: v }),
       setWallpaper: (url: string | null) => set({ wallpaper: url }),
@@ -536,6 +554,7 @@ export const usePhoneStore = create<PhoneState>()(
       name: 'webphone-storage',
       partialize: (state) => ({
         polaroidPhoto: state.polaroidPhoto, apiSettings: state.apiSettings,
+        cloneVoiceSettings: state.cloneVoiceSettings,
         neteaseApiUrl: state.neteaseApiUrl,
         darkMode: state.darkMode, wallpaper: state.wallpaper,
         customIcons: state.customIcons, chars: state.chars, userMasks: state.userMasks,
@@ -576,6 +595,7 @@ export const usePhoneStore = create<PhoneState>()(
         if (!p.moments) p.moments = []
         if (!p.momentGroups) p.momentGroups = []
         if (!p.forumPosts) p.forumPosts = []
+        if (!p.cloneVoiceSettings) p.cloneVoiceSettings = { enabled: false, groupId: '', apiKey: '' }
         return { ...current, ...p }
       },
     }

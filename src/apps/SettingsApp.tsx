@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Check, Loader2, AlertCircle, RefreshCw, Key, Moon, Palette, Info, MessageSquare, ImagePlus, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Check, Loader2, AlertCircle, RefreshCw, Key, Moon, Palette, Info, MessageSquare, ImagePlus, Trash2, Volume2 } from 'lucide-react'
 import { usePhoneStore } from '../store/phoneStore'
 
 const PRESET_MODELS = [
@@ -20,7 +20,7 @@ const CUSTOMIZABLE_APPS = [
 ]
 
 type TestStatus = 'idle' | 'testing' | 'success' | 'error' | 'errorDetail'
-type Page = 'main' | 'api' | 'models' | 'theme'
+type Page = 'main' | 'api' | 'models' | 'summaryModels' | 'cloneVoice' | 'theme'
 
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
@@ -50,11 +50,12 @@ function SettingsRow({ icon, iconBg, label, right, onClick, last = false }: {
 
 export default function SettingsApp() {
   const closeApp = usePhoneStore((s) => s.closeApp)
-  const { apiSettings, setApiSettings, darkMode, setDarkMode, wallpaper, setWallpaper, customIcons, setCustomIcon, removeCustomIcon } = usePhoneStore()
+  const { apiSettings, setApiSettings, cloneVoiceSettings, setCloneVoiceSettings, darkMode, setDarkMode, wallpaper, setWallpaper, customIcons, setCustomIcon, removeCustomIcon } = usePhoneStore()
   const [page, setPage] = useState<Page>('main')
   const [testStatus, setTestStatus] = useState<TestStatus>('idle')
   const [saved, setSaved] = useState(false)
   const [customModel, setCustomModel] = useState('')
+  const [customSummaryModel, setCustomSummaryModel] = useState('')
   const [fetchedModels, setFetchedModels] = useState<string[]>([])
   const [fetchingModels, setFetchingModels] = useState(false)
   const [toast, setToast] = useState('')
@@ -116,6 +117,7 @@ export default function SettingsApp() {
 
   function handleSave() { setSaved(true); setTimeout(() => setSaved(false), 2000) }
   const tempPercent = (apiSettings.temperature / 2) * 100
+  const summaryTempPercent = ((apiSettings.summaryTemperature ?? 0.7) / 2) * 100
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 2000) }
 
@@ -153,7 +155,10 @@ export default function SettingsApp() {
               label="夜间模式"
               right={<Toggle on={darkMode} onToggle={() => setDarkMode(!darkMode)} />} />
             <SettingsRow icon={<Palette className="w-[16px] h-[16px] text-white" />} iconBg="bg-pink-400"
-              label="更改主题" right={chevron} onClick={() => setPage('theme')} last />
+              label="更改主题" right={chevron} onClick={() => setPage('theme')} />
+            <SettingsRow icon={<Volume2 className="w-[16px] h-[16px] text-white" />} iconBg="bg-violet-500"
+              label="克隆音色（AI 语音）" right={<div className="flex items-center gap-1"><span className="text-[14px] text-ios-text-secondary">{cloneVoiceSettings.enabled ? '已开启' : '未开启'}</span>{chevron}</div>}
+              onClick={() => setPage('cloneVoice')} last />
           </div>
           <p className="text-[13px] font-semibold text-ios-text-secondary uppercase px-1 mb-[6px] mt-6">关于</p>
           <div className="bg-card rounded-[14px] overflow-hidden">
@@ -166,7 +171,7 @@ export default function SettingsApp() {
       </div>
 
       {/* === API Config (overlay) === */}
-      {(page === 'api' || page === 'models') && (
+      {(page === 'api' || page === 'models' || page === 'summaryModels') && (
         <div className="absolute inset-0 z-10 animate-page-push bg-ios-bg">
           <div className="flex flex-col h-full">
             <div className="flex items-center px-4 pt-[48px] pb-3 bg-header shrink-0">
@@ -216,6 +221,41 @@ export default function SettingsApp() {
                 <div className="flex justify-between text-[10px] text-ios-text-secondary mt-[6px]">
                   <span>精确</span><span>平衡</span><span>创意</span>
                 </div>
+              </div>
+              <p className="text-[13px] font-semibold text-ios-text-secondary uppercase px-1 mb-[6px] mt-5">高级 API 设置</p>
+              <div className="bg-card rounded-[14px] overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-[14px] border-b border-ios-bg">
+                  <span className="text-[15px] text-ios-text">启用高级设置</span>
+                  <Toggle on={!!apiSettings.advancedApiEnabled} onToggle={() => setApiSettings({ advancedApiEnabled: !apiSettings.advancedApiEnabled })} />
+                </div>
+                {apiSettings.advancedApiEnabled && (
+                  <>
+                    <button onClick={() => setPage('summaryModels')}
+                      className="w-full flex items-center justify-between px-4 py-[14px] border-b border-ios-bg active:bg-ios-bg/50 transition-colors">
+                      <span className="text-[15px] text-ios-text">记忆/总结用模型</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[15px] text-ios-text-secondary">{apiSettings.summaryModel || '未选择'}</span>
+                        {chevron}
+                      </div>
+                    </button>
+                    <div className="px-4 py-[12px] border-b border-ios-bg">
+                      <div className="flex items-center justify-between mb-[10px]">
+                        <span className="text-[15px] text-ios-text">总结用温度</span>
+                        <span className="text-[15px] text-ios-blue font-semibold tabular-nums">{(apiSettings.summaryTemperature ?? 0.7).toFixed(1)}</span>
+                      </div>
+                      <input type="range" min="0" max="2" step="0.1" value={apiSettings.summaryTemperature ?? 0.7}
+                        onChange={(e) => setApiSettings({ summaryTemperature: parseFloat(e.target.value) })}
+                        className="slider-pink"
+                        style={{ background: `linear-gradient(to right, #C9867E ${summaryTempPercent}%, #e5e5ea ${summaryTempPercent}%)` }} />
+                      <div className="flex justify-between text-[10px] text-ios-text-secondary mt-[6px]">
+                        <span>精确</span><span>平衡</span><span>创意</span>
+                      </div>
+                    </div>
+                    <div className="px-4 py-[10px]">
+                      <p className="text-[11px] text-ios-text-secondary/70">印象、手帐、日记、人设整理等使用此模型与温度，对话仍用上方主模型</p>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="mt-5 space-y-3">
                 <button onClick={testConnection}
@@ -283,6 +323,84 @@ export default function SettingsApp() {
               </div>
             </div>
           )}
+          {/* === Summary Model Picker (overlay on top of API) === */}
+          {page === 'summaryModels' && (
+            <div className="absolute inset-0 z-20 animate-page-push bg-ios-bg">
+              <div className="flex flex-col h-full">
+                <div className="flex items-center px-4 pt-[48px] pb-3 bg-header shrink-0">
+                  <button onClick={() => setPage('api')} className="text-ios-blue active:opacity-60 transition-opacity">
+                    <ChevronLeft className="w-7 h-7" />
+                  </button>
+                  <h1 className="text-[17px] font-semibold text-ios-text flex-1 text-center pr-[28px]">选择总结用模型</h1>
+                </div>
+                <div className="flex-1 overflow-y-auto px-4 pt-4 pb-6 scrollbar-none">
+                  <button onClick={fetchModels} disabled={fetchingModels || !apiBase || !apiSettings.apiKey}
+                    className="w-full flex items-center justify-center gap-2 bg-card rounded-[14px] py-[12px] mb-4 text-[14px] font-semibold text-ios-blue active:bg-ios-bg transition-colors disabled:opacity-40">
+                    <RefreshCw className={`w-4 h-4 ${fetchingModels ? 'animate-spin' : ''}`} />
+                    {fetchingModels ? '拉取中...' : '从 API 拉取模型列表'}
+                  </button>
+                  <p className="text-[13px] font-semibold text-ios-text-secondary uppercase px-1 mb-[6px]">
+                    {fetchedModels.length > 0 ? `已拉取 ${fetchedModels.length} 个模型` : '预设模型'}
+                  </p>
+                  <div className="bg-card rounded-[14px] overflow-hidden">
+                    {allModels.map((m, i) => (
+                      <button key={m} onClick={() => { setApiSettings({ summaryModel: m }); setPage('api') }}
+                        className={`w-full flex items-center justify-between px-4 py-[13px] active:bg-ios-bg transition-colors ${i < allModels.length - 1 ? 'border-b border-ios-bg' : ''}`}>
+                        <span className="text-[15px] text-ios-text truncate mr-2">{m}</span>
+                        {(apiSettings.summaryModel || 'gpt-4o-mini') === m && <Check className="w-5 h-5 text-ios-blue shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="bg-card rounded-[14px] mt-4 p-4">
+                    <label className="text-[12px] font-semibold text-ios-text-secondary mb-2 block">自定义模型名</label>
+                    <div className="flex gap-2">
+                      <input value={customSummaryModel} onChange={(e) => setCustomSummaryModel(e.target.value)} placeholder="输入模型 ID..."
+                        className="flex-1 bg-ios-bg rounded-[10px] px-3 py-[10px] text-[15px] text-ios-text outline-none placeholder:text-ios-text-secondary/50" />
+                      <button onClick={() => { if (customSummaryModel.trim()) { setApiSettings({ summaryModel: customSummaryModel.trim() }); setPage('api') } }}
+                        className="bg-ios-blue text-white rounded-[10px] px-4 text-[14px] font-semibold shrink-0 active:opacity-80">确定</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* === 克隆音色（MiniMax T2A）=== */}
+      {page === 'cloneVoice' && (
+        <div className="absolute inset-0 z-10 animate-page-push bg-ios-bg">
+          <div className="flex flex-col h-full">
+            <div className="flex items-center px-4 pt-[48px] pb-3 bg-header shrink-0">
+              <button onClick={() => setPage('main')} className="text-ios-blue active:opacity-60 transition-opacity">
+                <ChevronLeft className="w-7 h-7" />
+              </button>
+              <h1 className="text-[17px] font-semibold text-ios-text flex-1 text-center pr-[28px]">克隆音色（AI 语音）</h1>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 pt-4 pb-8 scrollbar-none">
+              <p className="text-[13px] font-semibold text-ios-text-secondary uppercase px-1 mb-[6px]">MiniMax T2A</p>
+              <div className="bg-card rounded-[14px] overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-[14px] border-b border-ios-bg">
+                  <span className="text-[15px] text-ios-text">开启克隆音色</span>
+                  <Toggle on={cloneVoiceSettings.enabled} onToggle={() => setCloneVoiceSettings({ enabled: !cloneVoiceSettings.enabled })} />
+                </div>
+                <div className="px-4 py-[12px] border-b border-ios-bg">
+                  <label className="text-[12px] font-semibold text-ios-text-secondary mb-[6px] block">Group ID</label>
+                  <input value={cloneVoiceSettings.groupId} onChange={(e) => setCloneVoiceSettings({ groupId: e.target.value })}
+                    placeholder="MiniMax 开放平台 Group ID"
+                    className="w-full bg-ios-bg rounded-[10px] px-3 py-[9px] text-[14px] text-ios-text outline-none placeholder:text-ios-text-secondary/50" />
+                </div>
+                <div className="px-4 py-[12px]">
+                  <label className="text-[12px] font-semibold text-ios-text-secondary mb-[6px] block">API Key</label>
+                  <input type="password" value={cloneVoiceSettings.apiKey} onChange={(e) => setCloneVoiceSettings({ apiKey: e.target.value })}
+                    placeholder="MiniMax API Key"
+                    className="w-full bg-ios-bg rounded-[10px] px-3 py-[9px] text-[14px] text-ios-text outline-none placeholder:text-ios-text-secondary/50" />
+                </div>
+              </div>
+              <p className="text-[11px] text-ios-text-secondary/80 mt-3 px-1">基于 MiniMax T2A 接口。在角色编辑中为该角色设置「音色 ID」后，聊天里可点击 AI 消息旁的播放按钮用该音色播放。</p>
+              <a href="https://platform.minimaxi.com/" target="_blank" rel="noopener noreferrer" className="text-[13px] text-ios-blue font-medium mt-2 inline-block px-1">前往 MiniMax 开放平台获取 →</a>
+            </div>
+          </div>
         </div>
       )}
 

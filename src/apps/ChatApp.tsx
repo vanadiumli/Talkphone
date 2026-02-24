@@ -3,9 +3,27 @@ import {
   ChevronLeft, ChevronRight, Plus, X, Check, Edit3, Trash2,
   MessageCircle, Users, UserCircle, Phone, Smile, Mic,
   MoreVertical, ImagePlus, Brain, Tag, Camera, ArrowUp,
-  PinIcon, EyeOff, Eye, Banknote, Copy, RotateCcw, Undo2, Quote, Share2, Heart,
+  PinIcon, EyeOff, Eye, Banknote, Copy, RotateCcw, Undo2, Quote, Share2, Heart, Volume2,
 } from 'lucide-react'
 import { usePhoneStore, buildCharPersona, buildMaskDescription, buildMemoryPrompt, getCharMemory, type AIChar, type UserMask, type Conversation, type ConvMessage, type DialogExample, type MemoryChunk, type Moment } from '../store/phoneStore'
+
+/** Web Speech API (Chrome); not in TS DOM lib */
+interface SpeechRecognitionLike {
+  start(): void
+  stop(): void
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((e: { resultIndex: number; results: { isFinal: boolean; 0: { transcript: string }; length: number }[] }) => void) | null
+  onerror: ((e: { error?: string }) => void) | null
+  onend: (() => void) | null
+}
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognitionLike
+    webkitSpeechRecognition?: new () => SpeechRecognitionLike
+  }
+}
 
 
 type Tab = 'chats' | 'contacts' | 'friends' | 'me'
@@ -475,7 +493,7 @@ function expandStickers(text: string): string {
 /* ─── Chat Conversation ─── */
 function ChatConversation({ convId, onBack }: { convId: string; onBack: () => void }) {
   const store = usePhoneStore()
-  const { conversations, chars, userMasks, apiSettings, wallpaper, worldBooks, addMessage, updateMessage, removeMessage } = store
+  const { conversations, chars, userMasks, apiSettings, cloneVoiceSettings, wallpaper, worldBooks, addMessage, updateMessage, removeMessage } = store
   const conv = conversations.find((c) => c.id === convId)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -489,8 +507,14 @@ function ChatConversation({ convId, onBack }: { convId: string; onBack: () => vo
   const [showTransfer, setShowTransfer] = useState(false)
   const [quotedMsg, setQuotedMsg] = useState<ConvMessage | null>(null)
   const [forwardingMsg, setForwardingMsg] = useState<ConvMessage | null>(null)
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false)
+  const [voiceError, setVoiceError] = useState<string | null>(null)
+  const [playingVoiceMsgId, setPlayingVoiceMsgId] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const lpTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const speechRecognitionRef = useRef<SpeechRecognitionLike | null>(null)
+  const voiceResultRef = useRef<string>('')
+  const cloneVoiceAudioRef = useRef<HTMLAudioElement | null>(null)
 
   if (!conv) { onBack(); return null }
   const char = chars.find((c) => c.id === conv.charIds[0])
@@ -611,6 +635,131 @@ function ChatConversation({ convId, onBack }: { convId: string; onBack: () => vo
       return '…'
     } finally {
       clearTimeout(timeout)
+    }
+  }
+
+  function getSpeechRecognitionConstructor(): (new () => SpeechRecognitionLike) | null {
+    if (typeof window === 'undefined') return null
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null
+  }
+
+  function startVoiceInput() {
+    setVoiceError(null)
+    voiceResultRef.current = ''
+    const Ctor = getSpeechRecognitionConstructor()
+    if (!Ctor) {
+      setVoiceError('当前浏览器不支持语音输入，请使用 Chrome')
+      return
+    }
+    const rec = speechRecognitionRef.current
+    if (rec) {
+      try { rec.stop() } catch { /* ignore */ }
+      speechRecognitionRef.current = null
+    }
+    const recognition = new Ctor()
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = 'zh-CN'
+    recognition.onresult = (e) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) voiceResultRef.current += e.results[i][0].transcript
+      }
+    }
+    recognition.onerror = (e) => {
+      const err = (e as { error?: string })?.error
+      const msg = err === 'not-allowed' ? '请允许麦克风权限'
+        : err === 'no-speech' ? '没检测到说话，请重试'
+        : err === 'network' ? '网络异常，请检查后重试'
+        : err === 'audio-capture' ? '无法使用麦克风'
+        : err ? `识别出错：${err}` : '识别出错，请重试'
+      setVoiceError(msg)
+    }
+    recognition.onend = () => { speechRecognitionRef.current = null; setIsRecordingVoice(false) }
+    speechRecognitionRef.current = recognition
+    setIsRecordingVoice(true)
+    try {
+      recognition.start()
+    } catch (err) {
+      setVoiceError('无法启动麦克风')
+      setIsRecordingVoice(false)
+    }
+  }
+
+  function stopVoiceInput() {
+    const rec = speechRecognitionRef.current
+    if (!rec) return
+    try {
+      rec.stop()
+    } catch { /* ignore */ }
+    speechRecognitionRef.current = null
+    setIsRecordingVoice(false)
+    const text = (voiceResultRef.current || '').trim()
+    if (text && !loading) {
+      setInput('')
+      const captured = quotedMsg
+      setQuotedMsg(null)
+      const userMsg: Partial<ConvMessage> = {}
+      let quoteExtra: string[] = []
+      if (captured) {
+        const senderName = captured.role === 'user' ? '你' : (convChars.find(c => c.id === captured.charId)?.name ?? char?.name ?? 'Ta')
+        userMsg.quotedText = captured.text.slice(0, 80)
+        userMsg.quotedSenderName = senderName
+        quoteExtra = [`用户引用了${senderName}的这句话「${captured.text.slice(0, 60)}」在回复`]
+      }
+      addMessage(convId, { text, time: nowTime(), role: 'user', ...userMsg })
+      if (apiSettings.baseUrl && apiSettings.apiKey) {
+        if (isGroup) {
+          sendGroupMessages(text, quoteExtra)
+        } else {
+          sendSingleMessage(text, quoteExtra)
+        }
+      } else {
+        addMessage(convId, { text: '请先在设置中配置 API 地址和密钥。', time: nowTime(), role: 'assistant' })
+      }
+    }
+  }
+
+  function hexToBlob(hex: string, contentType: string): Blob | null {
+    const hexString = hex.startsWith('0x') ? hex.slice(2) : hex
+    if (hexString.length % 2 !== 0) return null
+    const bytes = new Uint8Array(hexString.length / 2)
+    for (let i = 0; i < hexString.length; i += 2) bytes[i / 2] = parseInt(hexString.substring(i, i + 2), 16)
+    return new Blob([bytes], { type: contentType })
+  }
+
+  async function playCloneVoice(msg: ConvMessage) {
+    const msgChar = msg.charId ? convChars.find((c) => c.id === msg.charId) : char
+    if (!cloneVoiceSettings.enabled || !cloneVoiceSettings.groupId || !cloneVoiceSettings.apiKey || !msgChar?.cloneVoiceId || !msg?.text?.trim()) return
+    const cleanedText = msg.text.replace(/\(.*?\)|（.*?）/g, '').replace(/[\s\u200B-\u200D\uFEFF]/g, ' ').trim()
+    if (!cleanedText) return
+    if (cloneVoiceAudioRef.current) {
+      cloneVoiceAudioRef.current.pause()
+      cloneVoiceAudioRef.current = null
+    }
+    setPlayingVoiceMsgId(msg.id)
+    try {
+      const res = await fetch(`https://api.minimax.chat/v1/t2a_v2?GroupId=${cloneVoiceSettings.groupId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${cloneVoiceSettings.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: cleanedText, model: 'speech-02-hd', voice_setting: { voice_id: msgChar.cloneVoiceId } }),
+      })
+      const data = await res.json()
+      if (data.base_resp?.status_code !== 0 && data.base_resp?.status_code !== undefined) {
+        throw new Error(data.base_resp.status_msg || 'T2A 请求失败')
+      }
+      const hexAudio = data.data?.audio
+      if (!hexAudio) throw new Error('无音频数据')
+      const blob = hexToBlob(hexAudio, 'audio/mp3')
+      if (!blob) throw new Error('音频解析失败')
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      cloneVoiceAudioRef.current = audio
+      audio.onended = () => { setPlayingVoiceMsgId(null); URL.revokeObjectURL(url); cloneVoiceAudioRef.current = null }
+      audio.onerror = () => { setPlayingVoiceMsgId(null); URL.revokeObjectURL(url); cloneVoiceAudioRef.current = null }
+      await audio.play()
+    } catch (e) {
+      setPlayingVoiceMsgId(null)
+      console.error('克隆音色播放失败:', e)
     }
   }
 
@@ -890,7 +1039,18 @@ function ChatConversation({ convId, onBack }: { convId: string; onBack: () => vo
                       )}
                     </div>
                     {hasReactions && <div className="h-[16px]" />}
-                    {!nextSame && <span className="text-[9px] text-[#aaa] leading-none mt-[3px] ml-[2px]">{msg.time}</span>}
+                    {!nextSame && (
+                      <div className="flex items-center gap-2 mt-[3px] ml-[2px]">
+                        <span className="text-[9px] text-[#aaa] leading-none">{msg.time}</span>
+                        {!noBubble && msg.text && cloneVoiceSettings.enabled && msgChar?.cloneVoiceId && (
+                          <button onClick={() => playCloneVoice(msg)} disabled={!!playingVoiceMsgId}
+                            className="flex items-center gap-1 text-[10px] font-medium text-[#25D366] active:opacity-60 disabled:opacity-50">
+                            {playingVoiceMsgId === msg.id ? <span className="inline-block w-3 h-3 rounded-full bg-[#25D366] animate-pulse" /> : <Volume2 className="w-3.5 h-3.5" strokeWidth={2} />}
+                            播放
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )
@@ -937,7 +1097,20 @@ function ChatConversation({ convId, onBack }: { convId: string; onBack: () => vo
                 </div>
                 {hasReactions && <div className="h-[16px]" />}
                 {!nextSame && (
-                  <span className="text-[9px] text-[#aaa] leading-none mt-[2px] px-[2px]">{msg.time}</span>
+                  <div className="flex items-center gap-2 mt-[3px] px-[2px]">
+                    <span className="text-[9px] text-[#aaa] leading-none">{msg.time}</span>
+                    {!isUser && !msgNoBubble && msg.text && cloneVoiceSettings.enabled && char?.cloneVoiceId && (
+                      <button onClick={() => playCloneVoice(msg)} disabled={!!playingVoiceMsgId}
+                        className="flex items-center gap-1 text-[10px] font-medium text-[#25D366] active:opacity-60 disabled:opacity-50">
+                        {playingVoiceMsgId === msg.id ? (
+                          <span className="inline-block w-3 h-3 rounded-full bg-[#25D366] animate-pulse" />
+                        ) : (
+                          <Volume2 className="w-3.5 h-3.5" strokeWidth={2} />
+                        )}
+                        播放
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )
@@ -1025,12 +1198,25 @@ function ChatConversation({ convId, onBack }: { convId: string; onBack: () => vo
 
           {/* Input box or voice mode */}
           {voiceMode ? (
-            <button onTouchStart={() => {}} onTouchEnd={() => setVoiceMode(false)}
-              className="flex-1 bg-white rounded-full flex items-center justify-center h-[34px] gap-2 active:bg-gray-50"
-              style={{ boxShadow: '0 0.5px 2px rgba(0,0,0,0.07)' }}>
-              <Mic className="w-[15px] h-[15px] text-[#25D366]" strokeWidth={2} />
-              <span className="text-[13px] font-medium text-[#888]">按住说话</span>
-            </button>
+            <div className="flex-1 flex flex-col items-stretch gap-1">
+              {voiceError && (
+                <p className="text-[11px] text-amber-600 px-2 text-center">{voiceError}</p>
+              )}
+              <button
+                onPointerDown={(e) => { e.preventDefault(); startVoiceInput() }}
+                onPointerUp={(e) => { e.preventDefault(); stopVoiceInput(); setVoiceMode(false) }}
+                onPointerLeave={() => { if (isRecordingVoice) { stopVoiceInput(); setVoiceMode(false) } }}
+                onTouchStart={(e) => e.preventDefault()}
+                onTouchEnd={(e) => { e.preventDefault(); stopVoiceInput(); setVoiceMode(false) }}
+                className="bg-white rounded-full flex items-center justify-center h-[34px] gap-2 active:bg-gray-50 touch-none"
+                style={{ boxShadow: '0 0.5px 2px rgba(0,0,0,0.07)' }}
+              >
+                <Mic className={`w-[15px] h-[15px] ${isRecordingVoice ? 'text-red-500' : 'text-[#25D366]'}`} strokeWidth={2} />
+                <span className="text-[13px] font-medium text-[#888]">
+                  {isRecordingVoice ? '正在听…' : '按住说话'}
+                </span>
+              </button>
+            </div>
           ) : (
             <div className="flex-1 bg-white rounded-full flex items-center px-[12px] h-[34px] gap-[6px]"
               style={{ boxShadow: '0 0.5px 2px rgba(0,0,0,0.07)' }}>
@@ -1283,6 +1469,7 @@ function CharForm({ char, onBack, initialShowPreview }: { char?: AIChar; onBack:
   const [name, setName] = useState(char?.name ?? '')
   const [avatar, setAvatar] = useState(char?.avatar ?? '')
   const [rawPersona, setRawPersona] = useState(char?.rawPersona ?? '')
+  const [cloneVoiceId, setCloneVoiceId] = useState(char?.cloneVoiceId ?? '')
   const [processing, setProcessing] = useState(false)
   const [aiOrganize, setAiOrganize] = useState(true)
   const [organizeError, setOrganizeError] = useState('')
@@ -1303,7 +1490,7 @@ function CharForm({ char, onBack, initialShowPreview }: { char?: AIChar; onBack:
 
   async function handleSave() {
     if (!name.trim()) return
-    const base = { name: name.trim(), avatar, rawPersona }
+    const base = { name: name.trim(), avatar, rawPersona, cloneVoiceId: cloneVoiceId.trim() || undefined }
 
     if (!aiOrganize || !apiSettings.baseUrl || !apiSettings.apiKey || !rawPersona.trim()) {
       // If persona text changed, clear stale AI-processed data so new rawPersona is used directly
@@ -1345,13 +1532,16 @@ memoryChunks 3-5条，具体经历/爱好碎片化记忆。`
 
       const controller = new AbortController()
       const t = setTimeout(() => controller.abort(), 30000)
+      const useSummary = !!(apiSettings.advancedApiEnabled && apiSettings.summaryModel)
+      const organizeModel = useSummary ? apiSettings.summaryModel : (apiSettings.model || 'gemini-2.0-flash')
+      const organizeTemp = useSummary ? (apiSettings.summaryTemperature ?? 0.7) : 0.85
       const res = await fetch(`${apiSettings.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiSettings.apiKey}` },
         signal: controller.signal,
         body: JSON.stringify({
-          model: apiSettings.model || 'gemini-2.0-flash',
-          temperature: 0.85,
+          model: organizeModel,
+          temperature: organizeTemp,
           messages: [{ role: 'user', content: prompt }],
         }),
       })
@@ -1370,10 +1560,11 @@ memoryChunks 3-5条，具体经历/爱好碎片化记忆。`
       if (!jsonMatch) throw new Error('AI 未返回有效 JSON 格式')
 
       const parsed = JSON.parse(jsonMatch[0])
+      const rawChunks = Array.isArray(parsed.memoryChunks) ? parsed.memoryChunks.filter((m: MemoryChunk) => m.content) : []
       setPreview({
         corePrompt: parsed.corePrompt ?? '',
         dialogExamples: Array.isArray(parsed.dialogExamples) ? parsed.dialogExamples.filter((e: DialogExample) => e.user && e.reply) : [],
-        memoryChunks: Array.isArray(parsed.memoryChunks) ? parsed.memoryChunks.filter((m: MemoryChunk) => m.content) : [],
+        memoryChunks: rawChunks.map((m: MemoryChunk) => ({ ...m, tags: Array.isArray(m.tags) ? m.tags : [] })),
         expandExamples: false,
         expandMemory: false,
       })
@@ -1387,7 +1578,7 @@ memoryChunks 3-5条，具体经历/爱好碎片化记忆。`
 
   function confirmPreview() {
     if (!preview) return
-    const structured = { name: name.trim(), avatar, rawPersona, corePrompt: preview.corePrompt, dialogExamples: preview.dialogExamples, memoryChunks: preview.memoryChunks }
+    const structured = { name: name.trim(), avatar, rawPersona, corePrompt: preview.corePrompt, dialogExamples: preview.dialogExamples, memoryChunks: preview.memoryChunks, cloneVoiceId: cloneVoiceId.trim() || undefined }
     if (char) updateChar(char.id, structured); else addChar(structured)
     onBack()
   }
@@ -1466,7 +1657,7 @@ memoryChunks 3-5条，具体经历/爱好碎片化记忆。`
                 <div key={i} className="bg-card rounded-[14px] overflow-hidden">
                   <div className="px-4 py-[8px] border-b border-ios-bg">
                     <span className="text-[10px] font-bold text-ios-text-secondary/50 mr-2">触发词</span>
-                    <span className="text-[11px] text-[#25D366]">{chunk.tags.join('、')}</span>
+                    <span className="text-[11px] text-[#25D366]">{(Array.isArray(chunk.tags) ? chunk.tags : []).join('、')}</span>
                   </div>
                   <div className="px-4 py-[8px]">
                     <textarea value={chunk.content} onChange={(e) => { const n = [...preview.memoryChunks]; n[i] = { ...n[i], content: e.target.value }; setPreview({ ...preview, memoryChunks: n }) }}
@@ -1549,6 +1740,17 @@ memoryChunks 3-5条，具体经历/爱好碎片化记忆。`
         {hasProcessed && (
           <p className="text-[11px] text-[#25D366] px-1 mb-3">✓ 已完成 AI 整理，修改后保存将重新整理</p>
         )}
+
+        {/* 克隆音色 ID（MiniMax T2A） */}
+        <div className="bg-card rounded-[14px] overflow-hidden mb-4">
+          <div className="px-4 py-[12px]">
+            <label className="text-[12px] font-semibold text-ios-text-secondary mb-[6px] block">音色 ID（MiniMax 语音）</label>
+            <input value={cloneVoiceId} onChange={(e) => setCloneVoiceId(e.target.value)}
+              placeholder="留空则不使用语音克隆"
+              className="w-full bg-ios-bg rounded-[10px] px-3 py-[9px] text-[14px] text-ios-text outline-none placeholder:text-ios-text-secondary/50" />
+            <p className="text-[11px] text-ios-text-secondary/70 mt-[4px]">在设置中开启克隆音色并配置 MiniMax 后，AI 回复可点击播放为该角色音色</p>
+          </div>
+        </div>
 
         {/* AI Organize toggle */}
         <div className="bg-card rounded-[14px] overflow-hidden mb-2">
