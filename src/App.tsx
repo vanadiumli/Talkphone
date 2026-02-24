@@ -7,6 +7,8 @@ import SettingsApp from './apps/SettingsApp'
 import MemoApp from './apps/MemoApp'
 import MemoryApp from './apps/MemoryApp'
 import MusicApp from './apps/MusicApp'
+import WorldBookApp from './apps/WorldBookApp'
+import ForumApp from './apps/ForumApp'
 import PlaceholderApp from './apps/PlaceholderApp'
 
 const APP_MAP: Record<string, React.ComponentType> = {
@@ -15,6 +17,8 @@ const APP_MAP: Record<string, React.ComponentType> = {
   memo: MemoApp,
   memory: MemoryApp,
   music: MusicApp,
+  worldbook: WorldBookApp,
+  forum: ForumApp,
 }
 
 export default function App() {

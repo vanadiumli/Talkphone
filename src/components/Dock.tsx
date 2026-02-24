@@ -4,7 +4,7 @@ import { usePhoneStore } from '../store/phoneStore'
 const DOCK_APPS = [
   { id: 'chat', icon: MessageCircle, label: '消息' },
   { id: 'memory', icon: Brain, label: '记忆' },
-  { id: 'discover', icon: BookOpen, label: '书架' },
+  { id: 'worldbook', icon: BookOpen, label: '世界书' },
   { id: 'settings', icon: Settings, label: '设置' },
 ] as const
 

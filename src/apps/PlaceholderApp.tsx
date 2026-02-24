@@ -5,6 +5,7 @@ const TITLES: Record<string, string> = {
   moments: '朋友圈',
   discover: '发现',
   camera: '相机',
+  forum: '论坛',
   clock: '时钟',
   daily: 'Daily',
   book: 'Book',

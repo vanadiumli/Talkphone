@@ -76,6 +76,57 @@ export interface MusicTrack {
   liked: boolean
 }
 
+/** 世界书：世界设定，AI 回复时读取 */
+export interface WorldBookFolder {
+  id: string
+  name: string
+}
+export interface WorldBook {
+  id: string
+  name: string
+  content: string
+  folderId: string | null
+}
+
+/** 朋友圈 */
+export interface MomentComment {
+  id: string
+  authorId: string
+  authorName: string
+  content: string
+  timestamp: string
+  replyToCommentId?: string
+}
+export interface Moment {
+  id: string
+  authorId: string
+  authorName: string
+  avatar: string
+  content: string
+  imageUrl?: string
+  imageDescription?: string
+  timestamp: string
+  likes: string[]
+  comments: MomentComment[]
+  visibleToGroupId: 'public' | string
+}
+export interface MomentGroup {
+  id: string
+  name: string
+  memberIds: string[]
+}
+
+/** 论坛帖子 */
+export interface ForumPost {
+  id: string
+  content: string
+  authorId?: string
+  authorName: string
+  imageUrl?: string
+  timestamp: string
+  section: 'following' | 'recommended' | 'gossip'
+}
+
 export interface Conversation {
   id: string; charIds: string[]; maskId: string; messages: ConvMessage[]
   isGroup: boolean; nickname?: string; background?: string; unread: number
@@ -92,6 +143,8 @@ export interface Conversation {
   monthlyDiaries?: MonthlyDiary[]
   /** 每个角色独立的记忆区，key=charId */
   charMemories?: Record<string, CharMemory>
+  /** 绑定的世界书 ID 列表，AI 回复时注入 */
+  worldBookIds?: string[]
 }
 
 interface ApiSettings { baseUrl: string; apiKey: string; model: string; temperature: number }
@@ -110,6 +163,21 @@ interface PhoneState {
   neteaseApiUrl: string
   chars: AIChar[]; userMasks: UserMask[]; conversations: Conversation[]
   customStickers: string[]
+
+  worldBookFolders: WorldBookFolder[]; worldBooks: WorldBook[]
+  addWorldBookFolder: (f: Omit<WorldBookFolder, 'id'>) => void
+  addWorldBook: (w: Omit<WorldBook, 'id'>) => void
+  updateWorldBook: (id: string, u: Partial<WorldBook>) => void
+  removeWorldBook: (id: string) => void
+  removeWorldBookFolder: (id: string) => void
+
+  moments: Moment[]; momentGroups: MomentGroup[]
+  addMoment: (m: Omit<Moment, 'id' | 'likes' | 'comments'>) => void
+  toggleMomentLike: (momentId: string, userId: string) => void
+  addMomentComment: (momentId: string, c: Omit<MomentComment, 'id'>) => void
+
+  forumPosts: ForumPost[]
+  addForumPost: (p: Omit<ForumPost, 'id'>) => void
 
   openApp: (appId: string) => void; closeApp: () => void
   setTime: (t: string) => void; setPolaroidPhoto: (url: string) => void
@@ -136,6 +204,10 @@ interface PhoneState {
   toggleHideConversation: (id: string) => void
   addCustomSticker: (url: string) => void
   removeCustomSticker: (idx: number) => void
+}
+
+function generateId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
 /** 获取某角色在某对话中的记忆（含 legacy 兼容） */
@@ -340,6 +412,11 @@ export const usePhoneStore = create<PhoneState>()(
       userMasks: DEFAULT_MASKS,
       conversations: [],
       customStickers: [],
+      worldBookFolders: [],
+      worldBooks: [],
+      moments: [],
+      momentGroups: [],
+      forumPosts: [],
       playlist: [], currentTrackIndex: 0, isPlaying: false,
       addTrack: (t: Omit<MusicTrack, 'id'>) => set((s) => ({ playlist: [...s.playlist, { ...t, id: `track-${Date.now()}` }] })),
       removeTrack: (id: string) => set((s) => ({ playlist: s.playlist.filter((t) => t.id !== id), currentTrackIndex: Math.min(s.currentTrackIndex, Math.max(0, s.playlist.length - 2)) })),
@@ -423,6 +500,37 @@ export const usePhoneStore = create<PhoneState>()(
       toggleHideConversation: (id: string) => set((s) => ({ conversations: s.conversations.map((c) => c.id === id ? { ...c, hidden: !c.hidden } : c) })),
       addCustomSticker: (url: string) => set((s) => ({ customStickers: [...s.customStickers, url] })),
       removeCustomSticker: (idx: number) => set((s) => ({ customStickers: s.customStickers.filter((_, i) => i !== idx) })),
+
+      addWorldBookFolder: (f: Omit<WorldBookFolder, 'id'>) => set((s) => ({ worldBookFolders: [...s.worldBookFolders, { ...f, id: generateId() }] })),
+      addWorldBook: (w: Omit<WorldBook, 'id'>) => set((s) => ({ worldBooks: [...s.worldBooks, { ...w, id: generateId() }] })),
+      updateWorldBook: (id: string, u: Partial<WorldBook>) => set((s) => ({ worldBooks: s.worldBooks.map((w) => w.id === id ? { ...w, ...u } : w) })),
+      removeWorldBook: (id: string) => set((s) => ({ worldBooks: s.worldBooks.filter((w) => w.id !== id) })),
+      removeWorldBookFolder: (id: string) => set((s) => ({
+        worldBookFolders: s.worldBookFolders.filter((f) => f.id !== id),
+        worldBooks: s.worldBooks.map((w) => w.folderId === id ? { ...w, folderId: null } : w),
+      })),
+
+      addMoment: (m: Omit<Moment, 'id' | 'likes' | 'comments'>) => set((s) => ({
+        moments: [{ ...m, id: generateId(), likes: [], comments: [] }, ...s.moments],
+      })),
+      toggleMomentLike: (momentId: string, userId: string) => set((s) => ({
+        moments: s.moments.map((mom) => {
+          if (mom.id !== momentId) return mom
+          const has = mom.likes.includes(userId)
+          return { ...mom, likes: has ? mom.likes.filter((u) => u !== userId) : [...mom.likes, userId] }
+        }),
+      })),
+      addMomentComment: (momentId: string, c: Omit<MomentComment, 'id'>) => set((s) => ({
+        moments: s.moments.map((mom) =>
+          mom.id !== momentId
+            ? mom
+            : { ...mom, comments: [...mom.comments, { ...c, id: generateId() }] }
+        ),
+      })),
+
+      addForumPost: (p: Omit<ForumPost, 'id'>) => set((s) => ({
+        forumPosts: [{ ...p, id: generateId() }, ...s.forumPosts],
+      })),
     }),
     {
       name: 'webphone-storage',
@@ -432,6 +540,9 @@ export const usePhoneStore = create<PhoneState>()(
         darkMode: state.darkMode, wallpaper: state.wallpaper,
         customIcons: state.customIcons, chars: state.chars, userMasks: state.userMasks,
         conversations: state.conversations, customStickers: state.customStickers,
+        worldBookFolders: state.worldBookFolders, worldBooks: state.worldBooks,
+        moments: state.moments, momentGroups: state.momentGroups,
+        forumPosts: state.forumPosts,
       }),
       merge: (persisted: any, current: any) => {
         const p = persisted as Partial<typeof current>
@@ -446,6 +557,7 @@ export const usePhoneStore = create<PhoneState>()(
             pinned: c.pinned ?? false,
             hidden: c.hidden ?? false,
             charMemories: c.charMemories ?? {},
+            worldBookIds: c.worldBookIds ?? [],
           }))
         }
         if (!p.customStickers) p.customStickers = []
@@ -459,6 +571,11 @@ export const usePhoneStore = create<PhoneState>()(
             memoryChunks: c.memoryChunks ?? [],
           }))
         }
+        if (!p.worldBookFolders) p.worldBookFolders = []
+        if (!p.worldBooks) p.worldBooks = []
+        if (!p.moments) p.moments = []
+        if (!p.momentGroups) p.momentGroups = []
+        if (!p.forumPosts) p.forumPosts = []
         return { ...current, ...p }
       },
     }

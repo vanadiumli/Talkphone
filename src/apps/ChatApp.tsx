@@ -3,9 +3,9 @@ import {
   ChevronLeft, ChevronRight, Plus, X, Check, Edit3, Trash2,
   MessageCircle, Users, UserCircle, Phone, Smile, Mic,
   MoreVertical, ImagePlus, Brain, Tag, Camera, ArrowUp,
-  PinIcon, EyeOff, Eye, Banknote, Copy, RotateCcw, Undo2, Quote, Share2,
+  PinIcon, EyeOff, Eye, Banknote, Copy, RotateCcw, Undo2, Quote, Share2, Heart,
 } from 'lucide-react'
-import { usePhoneStore, buildCharPersona, buildMaskDescription, buildMemoryPrompt, getCharMemory, type AIChar, type UserMask, type Conversation, type ConvMessage, type DialogExample, type MemoryChunk } from '../store/phoneStore'
+import { usePhoneStore, buildCharPersona, buildMaskDescription, buildMemoryPrompt, getCharMemory, type AIChar, type UserMask, type Conversation, type ConvMessage, type DialogExample, type MemoryChunk, type Moment } from '../store/phoneStore'
 
 
 type Tab = 'chats' | 'contacts' | 'friends' | 'me'
@@ -475,7 +475,7 @@ function expandStickers(text: string): string {
 /* ─── Chat Conversation ─── */
 function ChatConversation({ convId, onBack }: { convId: string; onBack: () => void }) {
   const store = usePhoneStore()
-  const { conversations, chars, userMasks, apiSettings, wallpaper, addMessage, updateMessage, removeMessage } = store
+  const { conversations, chars, userMasks, apiSettings, wallpaper, worldBooks, addMessage, updateMessage, removeMessage } = store
   const conv = conversations.find((c) => c.id === convId)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -559,6 +559,10 @@ function ChatConversation({ convId, onBack }: { convId: string; onBack: () => vo
     const systemParts = [buildCharPersona(gc.name, gc)]
     if (mask?.description) systemParts.push(`【用户身份设定】\n${mask.description}`)
     systemParts.push(buildTimePrompt())
+    // 世界书：对话绑定的世界书或全部，作为世界设定注入
+    const wbIds = conv?.worldBookIds?.length ? conv.worldBookIds : worldBooks.map((w) => w.id)
+    const wbContent = worldBooks.filter((w) => wbIds.includes(w.id)).map((w) => w.content).filter(Boolean).join('\n\n')
+    if (wbContent) systemParts.push(`【世界设定】\n${wbContent}`)
     // 记忆：按角色独立读取
     const charMemory = conv ? getCharMemory(conv, gc.id) : null
     const memoryParts = charMemory ? buildMemoryPrompt(gc.name, charMemory, conv?.relationshipStage ?? 0, gc, historyMsgs) : []
@@ -1834,24 +1838,203 @@ function MeTab({ onShowMasks }: { onShowMasks: () => void }) {
   )
 }
 
-/* ─── Friends Tab ─── */
-function FriendsTab() {
-  const moments = [
-    { name: 'Lu Chen', avatar: '🌙', content: 'Beautiful moonlight tonight...', time: '2h' },
-    { name: 'Lin Zhiyu', avatar: '🌸', content: "Saw Monet's originals! Stunning 😍", time: '5h' },
-  ]
+/* ─── Friends Tab (朋友圈) ─── */
+function FriendsTab({ showPublishModal, onClosePublishModal }: { showPublishModal: boolean; onClosePublishModal: () => void }) {
+  const { moments, momentGroups, userMasks, addMoment, toggleMomentLike, addMomentComment } = usePhoneStore()
+  const [momentContent, setMomentContent] = useState('')
+  const [momentImage, setMomentImage] = useState<string | null>(null)
+  const [momentVisibleTo, setMomentVisibleTo] = useState<'public' | string>('public')
+  const [commentingMoment, setCommentingMoment] = useState<string | null>(null)
+  const [commentText, setCommentText] = useState('')
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
+  const currentUser = { id: 'user', name: userMasks[0]?.name ?? '我', avatar: userMasks[0]?.avatar ?? userMasks[0]?.emoji ?? '👤' }
+  const visibleMoments = moments
+
+  function formatTime(ts: string) {
+    const d = new Date(ts)
+    const now = new Date()
+    const diff = (now.getTime() - d.getTime()) / 60000
+    if (diff < 1) return '刚刚'
+    if (diff < 60) return `${Math.floor(diff)}分钟前`
+    if (diff < 1440) return `${Math.floor(diff / 60)}小时前`
+    if (diff < 43200) return `${Math.floor(diff / 1440)}天前`
+    return d.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
+  }
+
+  function handlePublish() {
+    if (!momentContent.trim()) return
+    addMoment({
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      avatar: typeof currentUser.avatar === 'string' && currentUser.avatar.length <= 8 ? currentUser.avatar : '👤',
+      content: momentContent.trim(),
+      imageUrl: momentImage ?? undefined,
+      timestamp: new Date().toISOString(),
+      visibleToGroupId: momentVisibleTo,
+    })
+    setMomentContent('')
+    setMomentImage(null)
+    setMomentVisibleTo('public')
+    onClosePublishModal()
+  }
+
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const r = new FileReader()
+    r.onload = () => setMomentImage(r.result as string)
+    r.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  function submitComment() {
+    if (!commentingMoment || !commentText.trim()) return
+    addMomentComment(commentingMoment, {
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      content: commentText.trim(),
+      timestamp: new Date().toISOString(),
+    })
+    setCommentText('')
+    setCommentingMoment(null)
+  }
+
   return (
     <div className="flex-1 overflow-y-auto scrollbar-none px-4 pt-3 pb-4 space-y-3">
-      {moments.map((m, i) => (
-        <div key={i} className="bg-card rounded-[14px] p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Avatar src={m.avatar} size={30} />
-            <span className="text-[13px] font-bold text-ios-text">{m.name}</span>
-            <span className="text-[11px] text-ios-text-secondary ml-auto">{m.time}</span>
-          </div>
-          <p className="text-[13px] font-medium text-ios-text leading-relaxed">{m.content}</p>
+      {visibleMoments.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-2">
+          <p className="text-[14px] font-bold text-ios-text-secondary">还没有朋友圈</p>
+          <p className="text-[12px] text-ios-text-secondary/60">点击右上角 + 发布第一条</p>
         </div>
-      ))}
+      ) : (
+        visibleMoments.map((m) => (
+          <MomentCard
+            key={m.id}
+            moment={m}
+            currentUserId="user"
+            onLike={() => toggleMomentLike(m.id, 'user')}
+            onComment={() => setCommentingMoment(m.id)}
+            formatTime={formatTime}
+          />
+        ))
+      )}
+
+      {/* Publish modal */}
+      {showPublishModal && (
+        <div className="absolute inset-0 z-[60] flex flex-col justify-end" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={onClosePublishModal}>
+          <div className="bg-card rounded-t-[24px] flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 pt-5 pb-3 border-b border-ios-bg shrink-0">
+              <p className="text-[16px] font-bold text-ios-text">发布朋友圈</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <textarea value={momentContent} onChange={(e) => setMomentContent(e.target.value)}
+                placeholder="这一刻的想法..." rows={4}
+                className="w-full bg-ios-bg rounded-[12px] px-4 py-3 text-[14px] text-ios-text outline-none resize-none placeholder:text-ios-text-secondary/50" />
+              {momentImage && (
+                <div className="relative inline-block">
+                  <img src={momentImage} alt="" className="w-[100px] h-[100px] object-cover rounded-[10px]" />
+                  <button onClick={() => setMomentImage(null)} className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center text-[14px]">×</button>
+                </div>
+              )}
+              <div className="flex items-center gap-4">
+                <label htmlFor="moment-image-upload" className="flex items-center gap-2 text-[13px] text-ios-text-secondary active:opacity-70 cursor-pointer">
+                  <ImagePlus className="w-5 h-5" strokeWidth={1.8} />
+                  <span>上传图片</span>
+                  <input id="moment-image-upload" ref={imageInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-[13px] text-ios-text-secondary">谁可以看</span>
+                  <select value={momentVisibleTo} onChange={(e) => setMomentVisibleTo(e.target.value as 'public' | string)}
+                    className="bg-ios-bg rounded-[8px] px-3 py-1.5 text-[13px] text-ios-text outline-none">
+                    <option value="public">所有人</option>
+                    {momentGroups.map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 pt-2 flex gap-3 border-t border-ios-bg shrink-0">
+              <button onClick={onClosePublishModal} className="flex-1 py-3 rounded-[12px] bg-ios-bg text-ios-text font-bold text-[14px] active:opacity-70">取消</button>
+              <button onClick={handlePublish} disabled={!momentContent.trim()}
+                className="flex-1 py-3 rounded-[12px] bg-[#1a1a1a] text-white font-bold text-[14px] active:opacity-80 disabled:opacity-50">发布</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Comment input modal */}
+      {commentingMoment && (
+        <div className="absolute inset-0 z-[60] flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setCommentingMoment(null)}>
+          <div className="bg-card rounded-t-[20px] w-full p-4 pb-[max(env(safe-area-inset-bottom),20px)]" onClick={(e) => e.stopPropagation()}>
+            <input value={commentText} onChange={(e) => setCommentText(e.target.value)}
+              placeholder="写评论..."
+              className="w-full bg-ios-bg rounded-[10px] px-4 py-3 text-[14px] text-ios-text outline-none mb-3" />
+            <div className="flex gap-3">
+              <button onClick={() => setCommentingMoment(null)} className="flex-1 py-2 rounded-[10px] bg-ios-bg text-ios-text font-bold text-[13px] active:opacity-70">取消</button>
+              <button onClick={submitComment} disabled={!commentText.trim()}
+                className="flex-1 py-2 rounded-[10px] bg-ios-blue text-white font-bold text-[13px] active:opacity-80 disabled:opacity-50">发送</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MomentCard({
+  moment,
+  currentUserId,
+  onLike,
+  onComment,
+  formatTime,
+}: {
+  moment: Moment
+  currentUserId: string
+  onLike: () => void
+  onComment: () => void
+  formatTime: (ts: string) => string
+}) {
+  const isLiked = moment.likes.includes(currentUserId)
+  return (
+    <div className="bg-card rounded-[14px] p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <Avatar src={moment.avatar} size={36} />
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-bold text-ios-text">{moment.authorName}</p>
+          <p className="text-[11px] text-ios-text-secondary">{formatTime(moment.timestamp)}</p>
+        </div>
+      </div>
+      <p className="text-[13px] font-medium text-ios-text leading-relaxed mb-2">{moment.content}</p>
+      {moment.imageUrl && (
+        <img src={moment.imageUrl} alt="" className="w-full max-w-[200px] rounded-[10px] object-cover mb-2" />
+      )}
+      {moment.likes.length > 0 && (
+        <div className="flex items-center gap-1 mb-2 text-[12px] text-ios-blue">
+          <Heart className="w-3.5 h-3.5 fill-current" strokeWidth={1.5} />
+          <span>{moment.likes.length} 人赞</span>
+        </div>
+      )}
+      {moment.comments.length > 0 && (
+        <div className="space-y-1 mb-2 pl-0">
+          {moment.comments.map((c) => (
+            <p key={c.id} className="text-[12px] text-ios-text-secondary">
+              <span className="font-bold text-ios-text">{c.authorName}</span>：{c.content}
+            </p>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-4 pt-2 border-t border-ios-bg/50">
+        <button onClick={onLike} className={`flex items-center gap-1.5 text-[12px] font-medium active:opacity-70 ${isLiked ? 'text-red-500' : 'text-ios-text-secondary'}`}>
+          <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} strokeWidth={1.5} />
+          赞
+        </button>
+        <button onClick={onComment} className="flex items-center gap-1.5 text-[12px] font-medium text-ios-text-secondary active:opacity-70">
+          <MessageCircle className="w-4 h-4" strokeWidth={1.5} />
+          评论
+        </button>
+      </div>
     </div>
   )
 }
@@ -1975,6 +2158,7 @@ export default function ChatApp() {
   const [showNewChat, setShowNewChat] = useState(false)
   const [activeConvId, setActiveConvId] = useState<string | null>(null)
   const [showMasks, setShowMasks] = useState(false)
+  const [showMomentPublish, setShowMomentPublish] = useState(false)
   const [editMode, setEditMode] = useState(false)
 
   const headerStyle = darkMode
@@ -2006,13 +2190,18 @@ export default function ChatApp() {
               )}
             </>
           )}
+          {tab === 'friends' && (
+            <button onClick={() => setShowMomentPublish(true)} className="active:opacity-60">
+              <Plus className="w-[22px] h-[22px] text-[#25D366]" strokeWidth={2.2} />
+            </button>
+          )}
         </div>
       </div>
 
       {tab === 'chats' && <FilterBar active={filter} onChange={setFilter} />}
       {tab === 'chats' && <ChatsTab filter={filter} onOpen={setActiveConvId} editMode={editMode} />}
       {tab === 'contacts' && <ContactsTab />}
-      {tab === 'friends' && <FriendsTab />}
+      {tab === 'friends' && <FriendsTab showPublishModal={showMomentPublish} onClosePublishModal={() => setShowMomentPublish(false)} />}
       {tab === 'me' && <MeTab onShowMasks={() => setShowMasks(true)} />}
 
       <div className="shrink-0 bg-header border-t border-ios-bg/50 z-10">

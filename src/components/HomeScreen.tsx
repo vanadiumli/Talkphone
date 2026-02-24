@@ -1,4 +1,4 @@
-import { Camera, Clock, CalendarDays } from 'lucide-react'
+import { Camera, MessageSquare, Clock, CalendarDays } from 'lucide-react'
 import { usePhoneStore } from '../store/phoneStore'
 import PolaroidWidget from '../widgets/PolaroidWidget'
 import CalendarWidget from '../widgets/CalendarWidget'
@@ -7,6 +7,7 @@ import AppIcon from './AppIcon'
 
 const HOME_APPS = [
   { id: 'camera', name: 'Camera', icon: Camera, color: '#8E8E93', iconColor: '#FFFFFF' },
+  { id: 'forum', name: '论坛', icon: MessageSquare, color: '#5C7CFA', iconColor: '#FFFFFF' },
   { id: 'clock', name: 'Clock', icon: Clock, color: '#1C1C1E', iconColor: '#FFFFFF' },
   { id: 'daily', name: 'Daily', icon: CalendarDays, color: '#E8E8ED', iconColor: '#8E8E93' },
 ]

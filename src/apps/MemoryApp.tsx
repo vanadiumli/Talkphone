@@ -422,10 +422,7 @@ export default function MemoryApp() {
 
                 {/* Relationship stage (auto from store) */}
                 <div className="bg-card rounded-[16px] p-4">
-                  <p className="text-[12px] font-bold text-ios-text-secondary mb-1">🌡️ 情感温度</p>
-                  <p className="text-[11px] text-ios-text-secondary/60 mb-3 leading-relaxed">
-                    设定 TA 对你的态度。陌生人话少敷衍，熟悉会分享，暧昧有心动话，爱人也撒娇。
-                  </p>
+                  <p className="text-[12px] font-bold text-ios-text-secondary mb-3">🌡️ 情感温度</p>
                   <div className="flex gap-[4px] mb-2">
                     {AFFECTION_STAGES.map((stage, i) => (
                       <button key={stage} onClick={() => conv && selectedCharId && updateCharMemory(conv.id, selectedCharId, { affectionTemp: i })}
