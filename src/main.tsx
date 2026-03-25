@@ -3,6 +3,25 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
 
+// #region agent log
+fetch('http://127.0.0.1:7815/ingest/fcf5ef23-5fd2-4507-a987-0b0da575aebe', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Debug-Session-Id': '25aad1',
+  },
+  body: JSON.stringify({
+    sessionId: '25aad1',
+    runId: 'pre-fix',
+    hypothesisId: 'H-link-1',
+    location: 'src/main.tsx:5',
+    message: 'App entry mounted',
+    data: {},
+    timestamp: Date.now(),
+  }),
+}).catch(() => {})
+// #endregion agent log
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null }
   static getDerivedStateFromError(error: Error) { return { error } }
