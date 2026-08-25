@@ -11,7 +11,7 @@ import MusicApp from './apps/MusicApp'
 import WorldBookApp from './apps/WorldBookApp'
 import ForumApp from './apps/ForumApp'
 import PlaceholderApp from './apps/PlaceholderApp'
-import { isPortfolioDemo } from './portfolioDemo'
+import { isPortfolioDemo, isPortfolioEmbed } from './portfolioDemo'
 
 const APP_MAP: Record<string, React.ComponentType> = {
   chat: ChatApp,
@@ -25,6 +25,7 @@ const APP_MAP: Record<string, React.ComponentType> = {
 
 export default function App() {
   const portfolioDemo = isPortfolioDemo()
+  const portfolioEmbed = isPortfolioEmbed()
   const currentApp = usePhoneStore((s) => s.currentApp)
   const closingApp = usePhoneStore((s) => s.closingApp)
   const darkMode = usePhoneStore((s) => s.darkMode)
@@ -55,9 +56,9 @@ export default function App() {
   const showStep1 = !portfolioDemo && !apiReady && !onboardingDone && currentApp !== 'settings'
   const showStep2 = !portfolioDemo && apiReady && conversations.length === 0 && currentApp === 'chat' && !onboardingDone
 
-  return (
+  const phone = (
     <div
-      className={`h-[100dvh] w-full max-w-[390px] mx-auto flex flex-col bg-ios-bg relative overflow-hidden ${darkMode ? 'dark-mode' : ''}`}
+      className={`talkphone-shell h-[100dvh] w-full max-w-[390px] mx-auto flex flex-col bg-ios-bg relative overflow-hidden ${darkMode ? 'dark-mode' : ''}`}
       style={wallpaper ? {
         backgroundImage: `url(${wallpaper})`,
         backgroundSize: 'cover',
@@ -153,4 +154,41 @@ export default function App() {
       )}
     </div>
   )
+
+  if (portfolioEmbed) {
+    return (
+      <main className="portfolio-embed">
+        <section className="portfolio-copy">
+          <p className="portfolio-kicker">AI COMPANION PROTOTYPE · 2026</p>
+          <h1>TalkPhone</h1>
+          <p className="portfolio-lead">从一次性回答，到一段持续发生的关系。</p>
+          <p className="portfolio-description">
+            TalkPhone 是一个 AI 角色陪伴原型。它通过角色设定、分层记忆，以及聊天、朋友圈、日记和论坛等拟人化社交场景，探索 AI 如何在长期互动中逐渐理解用户，同时保留可解释、可修改与可遗忘的边界。
+          </p>
+
+          <div className="portfolio-points">
+            <div><strong>分层记忆</strong><span>让长期关系留下连续、可控的痕迹</span></div>
+            <div><strong>社交化场景</strong><span>把陪伴延伸到聊天之外的日常互动</span></div>
+            <div><strong>可控边界</strong><span>记忆可查看、可修改，也允许被忘记</span></div>
+          </div>
+
+          <a
+            className="portfolio-cta"
+            href="https://talkphone.vercel.app/?demo=portfolio"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open full experience <span aria-hidden="true">↗</span>
+          </a>
+          <p className="portfolio-hint">右侧原型可直接输入消息，试着聊聊 AI、记忆或陪伴。</p>
+        </section>
+
+        <section className="portfolio-phone" aria-label="TalkPhone interactive prototype">
+          {phone}
+        </section>
+      </main>
+    )
+  }
+
+  return phone
 }

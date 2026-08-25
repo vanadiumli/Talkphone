@@ -5,6 +5,11 @@ export function isPortfolioDemo(): boolean {
   return new URLSearchParams(window.location.search).get('demo') === 'portfolio'
 }
 
+export function isPortfolioEmbed(): boolean {
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('embed') === 'portfolio'
+}
+
 export function getPortfolioDemoReply(input: string): string {
   const text = input.trim()
 
