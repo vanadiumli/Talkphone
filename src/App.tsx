@@ -159,18 +159,13 @@ export default function App() {
     return (
       <main className="portfolio-embed">
         <section className="portfolio-copy">
-          <p className="portfolio-kicker">AI COMPANION PROTOTYPE · 2026</p>
           <h1>TalkPhone</h1>
-          <p className="portfolio-lead">从一次性回答，到一段持续发生的关系。</p>
+          <p className="portfolio-meta">AI 角色扮演陪伴应用 ｜ 0–1 Vibe Coding ｜ 2026.01</p>
           <p className="portfolio-description">
-            TalkPhone 是一个 AI 角色陪伴原型。它通过角色设定、分层记忆，以及聊天、朋友圈、日记和论坛等拟人化社交场景，探索 AI 如何在长期互动中逐渐理解用户，同时保留可解释、可修改与可遗忘的边界。
+            独立完成 AI 陪伴应用从产品设计、开发到上线。通过角色设定与分层记忆改善长期对话连续性，并将聊天、朋友圈、日记和论坛组织为一套拟人化社交体验，探索 AI 如何在持续互动中逐渐理解用户。
           </p>
 
-          <div className="portfolio-points">
-            <div><strong>分层记忆</strong><span>让长期关系留下连续、可控的痕迹</span></div>
-            <div><strong>社交化场景</strong><span>把陪伴延伸到聊天之外的日常互动</span></div>
-            <div><strong>可控边界</strong><span>记忆可查看、可修改，也允许被忘记</span></div>
-          </div>
+          <p className="portfolio-note">分层记忆 · 角色设定 · 拟人化社交 · 可控边界</p>
 
           <a
             className="portfolio-cta"
@@ -178,9 +173,9 @@ export default function App() {
             target="_blank"
             rel="noreferrer"
           >
-            Open full experience <span aria-hidden="true">↗</span>
+            https://talkphone.vercel.app/ <span aria-hidden="true">↗</span>
           </a>
-          <p className="portfolio-hint">右侧原型可直接输入消息，试着聊聊 AI、记忆或陪伴。</p>
+          <p className="portfolio-hint">右侧可直接体验原型，试着聊聊 AI、记忆或陪伴。</p>
         </section>
 
         <section className="portfolio-phone" aria-label="TalkPhone interactive prototype">
