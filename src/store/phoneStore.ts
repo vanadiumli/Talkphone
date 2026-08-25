@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { isPortfolioDemo, PORTFOLIO_DEMO_CONVERSATION_ID } from '../portfolioDemo'
 
 export interface DialogExample {
   user: string   // what the other person says
@@ -417,17 +418,50 @@ const DEFAULT_MASKS: UserMask[] = [
   { id: 'mask-1', name: 'Default', emoji: '🧑', description: '就是你自己，自然相处。' },
 ]
 
+const PORTFOLIO_DEMO_CONVERSATION: Conversation = {
+  id: PORTFOLIO_DEMO_CONVERSATION_ID,
+  charIds: ['char-2'],
+  maskId: 'mask-1',
+  messages: [{
+    id: 'msg-portfolio-welcome',
+    text: '你回来啦。上次聊到 AI 陪伴，我还在想：真正的陪伴，重要的是及时回应，还是持续记得？',
+    time: 'Now',
+    role: 'assistant',
+    charId: 'char-2',
+  }],
+  isGroup: false,
+  unread: 1,
+  pinned: true,
+  hidden: false,
+  relationshipStage: 1,
+  impressionTags: ['好奇', '有判断力'],
+  impressionMonologue: '最近在思考 AI 陪伴中的记忆机制、关系体验与伦理边界。',
+  journalMonths: [],
+  worldBookIds: [],
+  charMemories: {
+    'char-2': {
+      impressionTags: ['好奇', '有判断力'],
+      impressionMonologue: '最近在思考 AI 陪伴中的记忆机制、关系体验与伦理边界。',
+      handEntries: [],
+      dailyDiaries: [],
+      monthlyDiaries: [],
+      affectionTemp: 1,
+      lastRefinedMessageCount: 1,
+    },
+  },
+}
+
 export const usePhoneStore = create<PhoneState>()(
   persist(
     (set: import('zustand').StoreApi<PhoneState>['setState']) => ({
-      currentApp: null, closingApp: false, time: getCurrentTime(),
+      currentApp: isPortfolioDemo() ? 'chat' : null, closingApp: false, time: getCurrentTime(),
       batteryLevel: 79, polaroidPhoto: null, darkMode: false, wallpaper: null, customIcons: {},
       apiSettings: { baseUrl: '', apiKey: '', model: '', temperature: 0.7, advancedApiEnabled: false, summaryModel: 'gpt-4o-mini', summaryTemperature: 0.7 },
       cloneVoiceSettings: { enabled: false, groupId: '', apiKey: '' },
       neteaseApiUrl: '',
       chars: DEFAULT_CHARS,
       userMasks: DEFAULT_MASKS,
-      conversations: [],
+      conversations: isPortfolioDemo() ? [PORTFOLIO_DEMO_CONVERSATION] : [],
       customStickers: [],
       worldBookFolders: [],
       worldBooks: [],
@@ -551,7 +585,7 @@ export const usePhoneStore = create<PhoneState>()(
       })),
     }),
     {
-      name: 'webphone-storage',
+      name: isPortfolioDemo() ? 'webphone-portfolio-demo-storage-v2' : 'webphone-storage',
       partialize: (state) => ({
         polaroidPhoto: state.polaroidPhoto, apiSettings: state.apiSettings,
         cloneVoiceSettings: state.cloneVoiceSettings,

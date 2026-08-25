@@ -6,6 +6,7 @@ import {
   PinIcon, EyeOff, Eye, Banknote, Copy, RotateCcw, Undo2, Quote, Share2, Heart, Volume2,
 } from 'lucide-react'
 import { usePhoneStore, buildCharPersona, buildMaskDescription, buildMemoryPrompt, getCharMemory, type AIChar, type UserMask, type Conversation, type ConvMessage, type DialogExample, type MemoryChunk, type Moment } from '../store/phoneStore'
+import { getPortfolioDemoReply, isPortfolioDemo, PORTFOLIO_DEMO_CONVERSATION_ID } from '../portfolioDemo'
 
 /** Web Speech API (Chrome); not in TS DOM lib */
 interface SpeechRecognitionLike {
@@ -779,6 +780,23 @@ function ChatConversation({ convId, onBack }: { convId: string; onBack: () => vo
       quoteExtra = [`用户引用了${senderName}的这句话「${captured.text.slice(0, 60)}」在回复`]
     }
     addMessage(convId, { text, time: nowTime(), role: 'user', ...userMsg })
+
+    if (isPortfolioDemo()) {
+      setLoading(true)
+      await new Promise((resolve) => setTimeout(resolve, 650))
+      const demoReplies = getPortfolioDemoReply(text).split('|||')
+      for (let i = 0; i < demoReplies.length; i++) {
+        if (i > 0) await new Promise((resolve) => setTimeout(resolve, 220))
+        addMessage(convId, {
+          text: demoReplies[i],
+          time: nowTime(),
+          role: 'assistant',
+          charId: char?.id,
+        })
+      }
+      setLoading(false)
+      return
+    }
 
     if (!apiSettings.baseUrl || !apiSettings.apiKey) {
       addMessage(convId, { text: '请先在设置中配置 API 地址和密钥。', time: nowTime(), role: 'assistant' }); return
@@ -2358,7 +2376,9 @@ export default function ChatApp() {
   const [tab, setTab] = useState<Tab>('chats')
   const [filter, setFilter] = useState<Filter>('all')
   const [showNewChat, setShowNewChat] = useState(false)
-  const [activeConvId, setActiveConvId] = useState<string | null>(null)
+  const [activeConvId, setActiveConvId] = useState<string | null>(() =>
+    isPortfolioDemo() ? PORTFOLIO_DEMO_CONVERSATION_ID : null
+  )
   const [showMasks, setShowMasks] = useState(false)
   const [showMomentPublish, setShowMomentPublish] = useState(false)
   const [editMode, setEditMode] = useState(false)

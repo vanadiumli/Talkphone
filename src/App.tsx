@@ -11,6 +11,7 @@ import MusicApp from './apps/MusicApp'
 import WorldBookApp from './apps/WorldBookApp'
 import ForumApp from './apps/ForumApp'
 import PlaceholderApp from './apps/PlaceholderApp'
+import { isPortfolioDemo } from './portfolioDemo'
 
 const APP_MAP: Record<string, React.ComponentType> = {
   chat: ChatApp,
@@ -23,6 +24,7 @@ const APP_MAP: Record<string, React.ComponentType> = {
 }
 
 export default function App() {
+  const portfolioDemo = isPortfolioDemo()
   const currentApp = usePhoneStore((s) => s.currentApp)
   const closingApp = usePhoneStore((s) => s.closingApp)
   const darkMode = usePhoneStore((s) => s.darkMode)
@@ -50,8 +52,8 @@ export default function App() {
 
   // Step 1: API not ready → guide user to open Settings and configure.
   // Step 2: API ready & no conversations yet → guide user to start a chat / create persona.
-  const showStep1 = !apiReady && !onboardingDone && currentApp !== 'settings'
-  const showStep2 = apiReady && conversations.length === 0 && currentApp === 'chat' && !onboardingDone
+  const showStep1 = !portfolioDemo && !apiReady && !onboardingDone && currentApp !== 'settings'
+  const showStep2 = !portfolioDemo && apiReady && conversations.length === 0 && currentApp === 'chat' && !onboardingDone
 
   return (
     <div
