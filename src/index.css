@@ -60,20 +60,11 @@ html, body, #root {
 }
 
 .portfolio-description {
-  max-width: 455px;
+  max-width: 390px;
   margin: 16px 0 0;
   font-size: 14px;
   line-height: 1.85;
   color: #333;
-}
-
-.portfolio-note {
-  margin: 20px 0 0;
-  padding-top: 16px;
-  border-top: 1px solid #222;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #555;
 }
 
 .portfolio-cta {
@@ -102,11 +93,192 @@ html, body, #root {
   min-width: 0;
 }
 
-.portfolio-embed .talkphone-shell {
-  height: min(720px, calc(100dvh - 48px));
-  border: 1px solid #e5e5e5;
-  border-radius: 30px;
-  box-shadow: none;
+.portfolio-chat-demo {
+  width: min(340px, 100%);
+  height: min(700px, calc(100dvh - 48px));
+  min-height: 560px;
+  display: grid;
+  grid-template-rows: 64px 1fr 70px;
+  overflow: hidden;
+  border: 1px solid #d8d8d8;
+  border-radius: 38px;
+  background: #f5f5f3;
+}
+
+.portfolio-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.portfolio-chat-header > span:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.portfolio-chat-header strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.portfolio-chat-header small {
+  margin-top: 2px;
+  font-size: 10px;
+  color: #54a86b;
+}
+
+.portfolio-chat-avatar {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #111;
+  color: #fff;
+  font-size: 12px;
+}
+
+.portfolio-bubble-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  overflow: hidden;
+  padding: 14px 12px 18px;
+}
+
+.portfolio-drop-bubble {
+  position: relative;
+  width: 92%;
+  min-height: 72px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 17px 17px 19px;
+  border-radius: 26px;
+  color: #111;
+  animation: portfolio-bubble-drop 620ms cubic-bezier(0.22, 0.82, 0.32, 1.18) both;
+}
+
+.portfolio-drop-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -18px;
+  width: 26px;
+  height: 30px;
+  background: inherit;
+  clip-path: polygon(0 0, 100% 0, 62% 100%);
+}
+
+.portfolio-drop-bubble.is-user {
+  align-self: flex-end;
+  border-bottom-right-radius: 10px;
+}
+
+.portfolio-drop-bubble.is-user::after {
+  right: 14px;
+  transform: scaleX(-1);
+}
+
+.portfolio-drop-bubble.is-companion {
+  align-self: flex-start;
+  border-bottom-left-radius: 10px;
+}
+
+.portfolio-drop-bubble.is-companion::after {
+  left: 14px;
+}
+
+.portfolio-drop-bubble.is-amber { background: #cf8600; }
+.portfolio-drop-bubble.is-orange { background: #eb4a0a; }
+.portfolio-drop-bubble.is-blue { background: #1269e8; color: #fff; }
+.portfolio-drop-bubble.is-cyan { background: #08bddb; }
+
+.portfolio-bubble-text {
+  max-width: 220px;
+  font-size: 12px;
+  line-height: 1.55;
+  font-weight: 600;
+}
+
+.portfolio-bubble-face {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+}
+
+.portfolio-bubble-face i {
+  position: absolute;
+  top: 5px;
+  width: 6px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.portfolio-bubble-face i:first-child { left: 4px; }
+.portfolio-bubble-face i:nth-child(2) { right: 4px; }
+
+.portfolio-bubble-face b {
+  position: absolute;
+  left: 8px;
+  bottom: 4px;
+  width: 10px;
+  height: 6px;
+  border-bottom: 3px solid currentColor;
+  border-radius: 0 0 10px 10px;
+}
+
+.portfolio-chat-input {
+  display: grid;
+  grid-template-columns: 1fr 42px;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 14px 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+}
+
+.portfolio-chat-input input {
+  width: 100%;
+  height: 40px;
+  border: 1px solid #d8d8d8;
+  border-radius: 20px;
+  outline: none;
+  padding: 0 15px;
+  background: #fff;
+  color: #111;
+  font: inherit;
+  font-size: 13px;
+  user-select: text;
+}
+
+.portfolio-chat-input input:focus {
+  border-color: #111;
+}
+
+.portfolio-chat-input button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: #111;
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@keyframes portfolio-bubble-drop {
+  0% { opacity: 0; transform: translateY(-150px) rotate(-2deg); }
+  68% { opacity: 1; transform: translateY(9px) rotate(0.5deg); }
+  84% { transform: translateY(-4px) rotate(0deg); }
+  100% { opacity: 1; transform: translateY(0) rotate(0deg); }
 }
 
 @media (max-width: 820px) {
@@ -118,10 +290,6 @@ html, body, #root {
 
   .portfolio-phone {
     margin-top: 6px;
-  }
-
-  .portfolio-embed .talkphone-shell {
-    height: min(720px, 88dvh);
   }
 }
 

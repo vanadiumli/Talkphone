@@ -11,6 +11,7 @@ import MusicApp from './apps/MusicApp'
 import WorldBookApp from './apps/WorldBookApp'
 import ForumApp from './apps/ForumApp'
 import PlaceholderApp from './apps/PlaceholderApp'
+import PortfolioChatPrototype from './components/PortfolioChatPrototype'
 import { isPortfolioDemo, isPortfolioEmbed } from './portfolioDemo'
 
 const APP_MAP: Record<string, React.ComponentType> = {
@@ -160,12 +161,8 @@ export default function App() {
       <main className="portfolio-embed">
         <section className="portfolio-copy">
           <h1>TalkPhone</h1>
-          <p className="portfolio-meta">AI 角色扮演陪伴应用 ｜ 0–1 Vibe Coding ｜ 2026.01</p>
-          <p className="portfolio-description">
-            独立完成 AI 陪伴应用从产品设计、开发到上线。通过角色设定与分层记忆改善长期对话连续性，并将聊天、朋友圈、日记和论坛组织为一套拟人化社交体验，探索 AI 如何在持续互动中逐渐理解用户。
-          </p>
-
-          <p className="portfolio-note">分层记忆 · 角色设定 · 拟人化社交 · 可控边界</p>
+          <p className="portfolio-meta">AI 角色陪伴原型 ｜ 2026.01</p>
+          <p className="portfolio-description">发送一条消息，看看对话如何从屏幕上方落下。</p>
 
           <a
             className="portfolio-cta"
@@ -175,11 +172,11 @@ export default function App() {
           >
             https://talkphone.vercel.app/ <span aria-hidden="true">↗</span>
           </a>
-          <p className="portfolio-hint">右侧可直接体验原型，试着聊聊 AI、记忆或陪伴。</p>
+          <p className="portfolio-hint">可以试着聊聊 AI、记忆或陪伴。</p>
         </section>
 
         <section className="portfolio-phone" aria-label="TalkPhone interactive prototype">
-          {phone}
+          <PortfolioChatPrototype />
         </section>
       </main>
     )
